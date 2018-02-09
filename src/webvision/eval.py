@@ -20,8 +20,7 @@ def MergeVal(info, validation_df):
 
 
 def MergeValFile(info, validation_filename):
-    return MergeVal(info,
-                    config._ParseTextFile(validation_filename))
+    return MergeVal(info, config._ParseTextFile(validation_filename))
 
 
 # Metrics

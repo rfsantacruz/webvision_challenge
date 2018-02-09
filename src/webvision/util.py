@@ -24,4 +24,3 @@ if __name__ == '__main__':
         merged_df = eval.MergeValFile(data_info, args.eval_val)
         print ("Top %d accurarcy is %0.3f."%(
             top_k, eval.TopK(merged_df, top_k)))
-        
