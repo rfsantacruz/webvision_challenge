@@ -16,9 +16,12 @@ def _test(data_split, model_name, model_kwargs_str, model_file):
     db_info = db_webv.LoadInfo()
     img_files = db_info[db_info.type == data_split].image_path.tolist()
     labels = db_info[db_info.type == data_split].label.tolist() if data_split != 'test' else None
-    input_fn = lambda: wvc_data.input_fn_from_files(img_files, labels=labels, shuffle=False, repeats=1, batch_size=1)
     num_classes, num_imgs = np.unique(labels).size, len(img_files)
     _logger.info("Dataset: split {} has {} classes and {} images".format(data_split, num_classes, num_imgs))
+
+    # Setup input pipeline
+    _logger.info("Setting up data input pipeline...")
+    input_fn = lambda: wvc_data.input_fn_from_files(img_files, labels=labels, shuffle=False, repeats=1, batch_size=1)
 
     # Build Keras Model
     _logger.info("Building keras models...")
@@ -26,7 +29,7 @@ def _test(data_split, model_name, model_kwargs_str, model_file):
     keras_model = wvc_model.cnn_factory(model_name, num_classes, **model_kwargs_dict)
     keras_model.summary(print_fn=_logger.info)
 
-    # Setup estimator's test
+    # Setup and run estimator's test
     _logger.info("Setting up tensorflow estimator and predict labels...")
     tf_estimator = tf.keras.estimator.model_to_estimator(keras_model=keras_model)
     preds_prob = tf_estimator.predict(input_fn=input_fn, predict_keys=['predictions'], checkpoint_path=model_file)

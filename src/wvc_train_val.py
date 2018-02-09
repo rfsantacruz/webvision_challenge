@@ -12,7 +12,7 @@ _logger = logging.getLogger(__name__)
 
 
 def _train_val(model_name, model_kwargs_str, output_dir, batch_size, num_epochs, validation_interval):
-    # Setup dataset and input pipeline
+    # Setup dataset
     _logger.info("Reading daataset...")
     db_info = db_webv.LoadInfo()
     train_img_files, train_labels = db_info[db_info.type == 'train'].image_path.tolist(), \
@@ -22,6 +22,9 @@ def _train_val(model_name, model_kwargs_str, output_dir, batch_size, num_epochs,
     num_classes, num_train_imgs, num_val_imgs = np.unique(train_labels).size, len(train_img_files), len(val_img_files)
     _logger.info("Dataset: {} classes, {} training images and {} validation images".format(
         num_classes, num_train_imgs, num_val_imgs))
+
+    # Setup input pipeline
+    _logger.info("Setting up data input pipeline...")
     train_input_fn = lambda: wvc_data.input_fn_from_files(
         train_img_files, labels=train_labels, shuffle=True, repeats=num_epochs*num_train_imgs+1, batch_size=batch_size)
     val_input_fn = lambda: wvc_data.input_fn_from_files(
@@ -33,7 +36,7 @@ def _train_val(model_name, model_kwargs_str, output_dir, batch_size, num_epochs,
     keras_model = wvc_model.cnn_factory(model_name, num_classes, **model_kwargs_dict)
     keras_model.summary(print_fn=_logger.info)
 
-    # Setup estimator's train and validation
+    # Setup and run estimator's train and validation
     _logger.info("Setting up tensorflow estimator...")
     tf_estimator = tf.keras.estimator.model_to_estimator(keras_model=keras_model, model_dir=output_dir)
     train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, max_steps=num_epochs*int(math.ceil(num_train_imgs/batch_size)))
