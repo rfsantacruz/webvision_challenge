@@ -23,18 +23,19 @@ def _train_val(model_name, model_kwargs_str, output_dir, batch_size, num_epochs,
     _logger.info("Dataset: {} classes, {} training images and {} validation images".format(
         num_classes, num_train_imgs, num_val_imgs))
 
-    # Setup input pipeline
-    _logger.info("Setting up data input pipeline...")
-    train_input_fn = lambda: wvc_data.input_fn_from_files(
-        train_img_files, labels=train_labels, shuffle=True, repeats=num_epochs*num_train_imgs+1, batch_size=batch_size)
-    val_input_fn = lambda: wvc_data.input_fn_from_files(
-        val_img_files, labels=val_labels, shuffle=False, repeats=1, batch_size=batch_size)
-
     # Build keras model
     _logger.info("Building keras models...")
     model_kwargs_dict = wvc_utils.get_kwargs_dic(model_kwargs_str)
-    keras_model = wvc_model.cnn_factory(model_name, num_classes, **model_kwargs_dict)
+    keras_model = wvc_model.cnn_factory(model_name, num_classes, wvc_data.IMAGE_INPUT_SHAPE, **model_kwargs_dict)
     keras_model.summary(print_fn=_logger.info)
+    input_name = keras_model.layers[0].name
+
+    # Setup input pipeline
+    _logger.info("Setting up data input pipeline...")
+    train_input_fn = lambda: wvc_data.input_fn_from_files(
+        input_name, train_img_files, labels=train_labels, mode='train', shuffle=True, repeats=num_epochs, batch_size=batch_size)
+    val_input_fn = lambda: wvc_data.input_fn_from_files(
+        input_name, val_img_files, labels=val_labels, mode='val', shuffle=False, repeats=1, batch_size=batch_size)
 
     # Setup and run estimator's train and validation
     _logger.info("Setting up tensorflow estimator...")

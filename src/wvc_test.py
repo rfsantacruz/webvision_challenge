@@ -19,15 +19,17 @@ def _test(data_split, model_name, model_kwargs_str, model_file):
     num_classes, num_imgs = np.unique(labels).size, len(img_files)
     _logger.info("Dataset: split {} has {} classes and {} images".format(data_split, num_classes, num_imgs))
 
-    # Setup input pipeline
-    _logger.info("Setting up data input pipeline...")
-    input_fn = lambda: wvc_data.input_fn_from_files(img_files, labels=labels, shuffle=False, repeats=1, batch_size=1)
-
     # Build Keras Model
     _logger.info("Building keras models...")
     model_kwargs_dict = wvc_utils.get_kwargs_dic(model_kwargs_str)
-    keras_model = wvc_model.cnn_factory(model_name, num_classes, **model_kwargs_dict)
+    keras_model = wvc_model.cnn_factory(model_name, num_classes, wvc_data.IMAGE_INPUT_SHAPE, **model_kwargs_dict)
     keras_model.summary(print_fn=_logger.info)
+    input_name = keras_model.layers[0].name
+
+    # Setup input pipeline
+    _logger.info("Setting up data input pipeline...")
+    input_fn = lambda: wvc_data.input_fn_from_files(
+        input_name, img_files, labels=labels, mode='test', shuffle=False, repeats=1, batch_size=1)
 
     # Setup and run estimator's test
     _logger.info("Setting up tensorflow estimator and predict labels...")

@@ -4,10 +4,13 @@
 import numpy as np
 import tensorflow as tf
 
+# Constants
+DATASET_MEAN = np.array([100, 100, 100], np.float32)
+IMAGE_INPUT_SHAPE = [224, 224, 3]
+
 
 # Input function
-def input_fn_from_files(filenames, labels=None, prep_func=None, shuffle=False, repeats=1, batch_size=1):
-
+def input_fn_from_files(input_name, filenames, labels=None, mode='train', shuffle=False, repeats=1, batch_size=1):
     # Set up tensorflow Dataset
     labels = np.expand_dims(-1*np.ones(len(filenames)), axis=1) if labels is None \
         else np.expand_dims(np.array(labels), axis=1)
@@ -15,11 +18,11 @@ def input_fn_from_files(filenames, labels=None, prep_func=None, shuffle=False, r
     filenames = tf.constant(filenames)
     dataset = tf.data.Dataset.from_tensor_slices((filenames, labels))
 
-    # Preprocessing and augmentation
-    if prep_func is None:
-        dataset = dataset.map(prep_func)
-    else:
-        dataset = dataset.map(_default_img_label_prep)
+    # Processing images and labels
+    prep_funcs = {'train': _train_input_parse, 'val': _val_input_parse, 'test': _test_input_parse}
+    dataset = dataset.map(prep_funcs[mode], num_parallel_calls=10)
+    dataset = dataset.map(lambda image, label: (dict(zip([input_name], [image])), label))
+    dataset = dataset.prefetch(int(batch_size/2))
 
     # Configure batches
     if shuffle:
@@ -31,13 +34,25 @@ def input_fn_from_files(filenames, labels=None, prep_func=None, shuffle=False, r
     return batch_imgs, batch_labels
 
 
-def _default_img_label_prep(filename, label):
+# Parse functions
+# Training parsing function
+def _train_input_parse(filename, label):
     image_string = tf.read_file(filename)
     image = tf.image.decode_image(image_string, channels=3)
-    image.set_shape([None, None, None])
-    image = tf.image.resize_images(image, [150, 150])
-    image = tf.subtract(image, 116.779)  # Zero-center by mean pixel
-    image.set_shape([150, 150, 3])
-    image = tf.reverse(image, axis=[2])  # 'RGB'->'BGR'
-    d = dict(zip(['input_img'], [image])), label
-    return d
+    image = tf.random_crop(image, IMAGE_INPUT_SHAPE)
+    image.set_shape(IMAGE_INPUT_SHAPE)
+    return image, label
+
+
+# Validation parsing function
+def _val_input_parse(filename, label):
+    image_string = tf.read_file(filename)
+    image = tf.image.decode_image(image_string, channels=3)
+    image = tf.image.resize_image_with_crop_or_pad(image, IMAGE_INPUT_SHAPE[0], IMAGE_INPUT_SHAPE[1])
+    image.set_shape(IMAGE_INPUT_SHAPE)
+    return image, label
+
+
+# Test parsing function
+def _test_input_parse(filename, label):
+    return _val_input_parse(filename, label)
