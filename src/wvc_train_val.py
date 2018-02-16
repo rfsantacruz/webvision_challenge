@@ -14,7 +14,7 @@ def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=25, c
     # Data loading
     _logger.info("Reading WebVision Dataset")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    train_db = wvc_data.WebVision('train', transform=transforms.Compose([transforms.RandomSizedCrop(224),
+    train_db = wvc_data.WebVision('train', transform=transforms.Compose([transforms.RandomResizedCrop(224),
                                                                          transforms.RandomHorizontalFlip(),
                                                                          transforms.ToTensor(), normalize]))
     train_data_loader = dataloader.DataLoader(train_db, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
@@ -27,13 +27,13 @@ def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=25, c
     _logger.info("Building Model: {}".format(model_name))
     kwargs_dic = wvc_utils.get_kwargs_dic(kwargs_str)
     _logger.info("Arguments: {}".format(kwargs_dic))
-    model = wvc_model.model_factory(model_name, **kwargs_dic)
+    model = wvc_model.model_factory(model_name, kwargs_dic)
     _logger.info("Parallelizing model in {} GPUS".format(device_count()))
     model = torch.nn.DataParallel(model).cuda()
     if checkpoint is not None:
         _logger.info("Resume training from {}".format(checkpoint))
         checkpoint = torch.load(checkpoint)
-        start_epoch = checkpoint['epoch']
+        start_epoch = checkpoint['epoch'] - 1
         best_acc5 = checkpoint['best_acc5']
         model.load_state_dict(checkpoint['state_dict'])
     else:
@@ -42,7 +42,8 @@ def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=25, c
     # Objective and Optimizer
     _logger.info("Setting up loss function and optimizer")
     criterion = torch.nn.CrossEntropyLoss().cuda()
-    optimizer = torch.optim.Adam(model.parameters(), **kwargs_dic)
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(kwargs_dic.get("lr", 1e-3)),
+                                 weight_decay=float(kwargs_dic.get("weight_decay", 1e-4)))
 
     # Training and Validation loop
     _logger.info("Training...")
@@ -51,14 +52,14 @@ def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=25, c
         wvc_model.train(train_data_loader, model, criterion, optimizer, epoch)
 
         # Validation
-        if epoch % valid_int == 0:
+        if (epoch + 1) % valid_int == 0:
             _logger.info("Validating...")
             val_loss, val_acc1, val_acc5 = wvc_model.validate(val_data_loader, model, criterion, epoch)
             _logger.info("Epoch {}/{}: val_loss={:.3f}, val_acc1={:.3f}, val_acc5={:.3f}"
-                         .format(epoch, num_epochs, val_loss, val_acc1, val_acc5))
+                         .format(epoch+1, num_epochs, val_loss, val_acc1, val_acc5))
 
             # save checkpoint
-            model_ckp_name = "M{}_E{}_L{}_ACC1{}_ACC5_{}.pth.tar".format(model_name, epoch, val_loss, val_acc1, val_acc5)
+            model_ckp_name = "M{}_E{}_L{:.3f}_ACC1{:.3f}_ACC5_{:.3f}.pth.tar".format(model_name, epoch+1, val_loss, val_acc1, val_acc5)
             _logger.info("Save model checkpoint to {}".format(os.path.join(output_dir, model_ckp_name)))
             is_best = val_acc5 > best_acc5
             best_acc5 = max(val_acc5, best_acc5)

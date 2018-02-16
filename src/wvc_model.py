@@ -37,8 +37,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
         c_loss += loss.data[0]
 
         if i % 100 == 0:
-            _logger.info("Train epoch {}({}/{}): Loss={}, ACC_1={}, ACC_={}".format(
-                epoch, i, total_batches, c_loss / i, c_acc1 / i, c_acc5 / i))
+            _logger.info("Train epoch {} ({}/{}): Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
+                epoch, i, total_batches, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
 
 
 def validate(val_loader, model, criterion, epoch):
@@ -62,28 +62,28 @@ def validate(val_loader, model, criterion, epoch):
         c_acc5 += wvc_model.top_k_acc(labels, y_pred.data, top_k=5)
         c_loss += loss.data[0]
         if i % 100 == 0:
-            _logger.info("Validation {} ({}/{}): Loss={}, ACC_1={}, ACC_={}".format(
-                epoch, i, total_batches, c_loss / i, c_acc1 / i, c_acc5 / i))
+            _logger.info("Validation {} ({}/{}): Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
+                epoch, i, total_batches, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
 
     return c_loss / total_batches, c_acc1 / total_batches, c_acc5 / total_batches
 
 
 def model_factory(model_name, model_kwargs_dict):
     if model_name == MODELS[0]:
-        return torchvision.models.vgg16(pretrained=False)
+        return torchvision.models.vgg16(pretrained=False, num_classes=1000)
     if model_name == MODELS[1]:
-        return torchvision.models.inception_v3(pretrained=False)
+        return torchvision.models.inception_v3(pretrained=False, num_classes=1000)
     if model_name == MODELS[2]:
-        return torchvision.models.resnet152(pretrained=False)
+        return torchvision.models.resnet152(pretrained=False, num_classes=1000)
     if model_name == MODELS[3]:
-        return torchvision.models.densenet201(pretrained=False)
+        return torchvision.models.densenet201(pretrained=False, num_classes=1000)
     else:
         raise ValueError("Model {} is not supported".format(model_name))
 
 
 def top_k_acc(y_true, y_pred, top_k=5):
     pred_labels = torch.topk(y_pred, top_k)[1].int()
-    true_labels = y_true.int()
+    true_labels = y_true.view(-1, 1).int()
     acc = torch.eq(true_labels, pred_labels).int()
     acc = torch.sum(acc, 1)
     acc = torch.gt(acc, 0).int()
