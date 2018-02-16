@@ -27,8 +27,9 @@ def _train_val(model_name, model_kwargs_str, output_dir, batch_size, num_epochs,
     _logger.info("Building keras models...")
     model_kwargs_dict = wvc_utils.get_kwargs_dic(model_kwargs_str)
     keras_model = wvc_model.cnn_factory(model_name, num_classes, wvc_data.IMAGE_INPUT_SHAPE, **model_kwargs_dict)
-    keras_model.summary(print_fn=_logger.info)
     input_name = keras_model.layers[0].name
+    _logger.info("Model {} kwargs {}:".format(model_name, model_kwargs_dict))
+    keras_model.summary(print_fn=_logger.info)
 
     # Setup input pipeline
     _logger.info("Setting up data input pipeline...")
@@ -39,9 +40,14 @@ def _train_val(model_name, model_kwargs_str, output_dir, batch_size, num_epochs,
 
     # Setup and run estimator's train and validation
     _logger.info("Setting up tensorflow estimator...")
-    tf_estimator = tf.keras.estimator.model_to_estimator(keras_model=keras_model, model_dir=output_dir)
-    train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, max_steps=num_epochs*int(math.ceil(num_train_imgs/batch_size)))
-    val_spec = tf.estimator.EvalSpec(input_fn=val_input_fn)
+    steps_per_epoch = int(math.ceil(num_train_imgs/batch_size))
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    tf_estimator = tf.keras.estimator.model_to_estimator(
+        keras_model=keras_model, model_dir=output_dir,
+        config=tf.estimator.RunConfig(save_checkpoints_steps=steps_per_epoch, save_summary_steps=1, session_config=config))
+    train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, max_steps=num_epochs*steps_per_epoch)
+    val_spec = tf.estimator.EvalSpec(input_fn=val_input_fn, throttle_secs=18000)
     _logger.info("Training...")
     tf.estimator.train_and_evaluate(tf_estimator, train_spec, val_spec)
 
@@ -53,7 +59,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Training and Validation Tool",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('model_name', type=str, help="CNN model name.")
-    parser.add_argument('model_kwargs_str', type=str, help="CNN model parameters (ex: k1=v1;k2=v2;...).")
+    parser.add_argument('-model_kwargs_str', type=str, help="CNN model parameters (ex: k1=v1;k2=v2;...).")
     parser.add_argument('output_dir', type=str, help="Output directory.")
     parser.add_argument('-batch_size', type=int, default=128, help="Number of samples per batch.")
     parser.add_argument('-num_epochs', type=int, default=100, help="Number of training epochs.")

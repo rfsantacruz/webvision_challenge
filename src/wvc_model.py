@@ -2,8 +2,8 @@
 # Author: Rodrigo Santa Cruz
 # Date: 8/02/18
 
-from keras.applications import VGG16, InceptionResNetV2, DenseNet201
-import keras as k
+from tensorflow.python.keras.applications import VGG16, InceptionResNetV2
+from tensorflow.python import keras as k
 import tensorflow as tf
 import logging
 
@@ -17,7 +17,8 @@ def cnn_factory(model_name, num_classes, input_shape, **kwargs):
     elif model_name == MODEL_NAME[1]:
         return resnet(num_classes, input_shape, **kwargs)
     elif model_name == MODEL_NAME[2]:
-        return densenet(num_classes, input_shape, **kwargs)
+        # return densenet(num_classes, input_shape, **kwargs)
+        raise ValueError("Dense model requires tensorflow 1.6!")
     else:
         raise ValueError("Model {} does not supported".format(model_name))
 
@@ -36,8 +37,8 @@ def vgg16(num_classes, input_shape, **kwargs):
     else:
         model_vgg16 = VGG16(include_top=True, classes=num_classes, input_shape=input_shape, weights=None)
     model_vgg16.compile(loss=k.losses.sparse_categorical_crossentropy,
-                        optimizer=k.optimizers.adam(lr=lr),
-                        metrics=k.metrics.sparse_top_k_categorical_accuracy)
+                        optimizer=k.optimizers.Adam(lr=lr),
+                        metrics=[k.metrics.sparse_top_k_categorical_accuracy])
     return model_vgg16
 
 
@@ -55,25 +56,25 @@ def resnet(num_classes, input_shape, **kwargs):
     else:
         model_resnet = InceptionResNetV2(include_top=True, classes=num_classes, input_shape=input_shape, weights=None)
     model_resnet.compile(loss=k.losses.sparse_categorical_crossentropy,
-                         optimizer=k.optimizers.adam(lr=lr),
-                         metrics=k.metrics.sparse_top_k_categorical_accuracy)
+                         optimizer=k.optimizers.Adam(lr=lr),
+                         metrics=[k.metrics.sparse_top_k_categorical_accuracy])
     return model_resnet
 
 
-def densenet(num_classes, input_shape, **kwargs):
-    _logger.info("Building DenseNet")
-    lr = float(kwargs.get('lr', 1e-3))
-    num_gpus = int(kwargs.get('num_gpus', 1))
-    _logger.info("Model parameters for DenseNet: num_classes={}, input_shape={}, lr={}, num_gpus={}".format(
-        num_classes, input_shape, lr, num_gpus))
-
-    if num_gpus >= 2:
-        with tf.device('/cpu:0'):
-            model_densenet = DenseNet201(include_top=True, classes=num_classes, input_shape=input_shape, weights=None)
-        model_densenet = k.utils.multi_gpu_model(model_densenet, num_gpus)
-    else:
-        model_densenet = DenseNet201(include_top=True, classes=num_classes, input_shape=input_shape, weights=None)
-    model_densenet.compile(loss=k.losses.sparse_categorical_crossentropy,
-                           optimizer=k.optimizers.adam(lr=lr),
-                           metrics=k.metrics.sparse_top_k_categorical_accuracy)
-    return model_densenet
+# def densenet(num_classes, input_shape, **kwargs):
+#     _logger.info("Building DenseNet")
+#     lr = float(kwargs.get('lr', 1e-3))
+#     num_gpus = int(kwargs.get('num_gpus', 1))
+#     _logger.info("Model parameters for DenseNet: num_classes={}, input_shape={}, lr={}, num_gpus={}".format(
+#         num_classes, input_shape, lr, num_gpus))
+#
+#     if num_gpus >= 2:
+#         with tf.device('/cpu:0'):
+#             model_densenet = DenseNet201(include_top=True, classes=num_classes, input_shape=input_shape, weights=None)
+#         model_densenet = k.utils.multi_gpu_model(model_densenet, num_gpus)
+#     else:
+#         model_densenet = DenseNet201(include_top=True, classes=num_classes, input_shape=input_shape, weights=None)
+#     model_densenet.compile(loss=k.losses.sparse_categorical_crossentropy,
+#                            optimizer=k.optimizers.adam(lr=lr),
+#                            metrics=[k.metrics.sparse_categorical_accuracy, k.metrics.sparse_top_k_categorical_accuracy])
+#     return model_densenet

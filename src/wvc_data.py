@@ -22,7 +22,7 @@ def input_fn_from_files(input_name, filenames, labels=None, mode='train', shuffl
     prep_funcs = {'train': _train_input_parse, 'val': _val_input_parse, 'test': _test_input_parse}
     dataset = dataset.map(prep_funcs[mode], num_parallel_calls=10)
     dataset = dataset.map(lambda image, label: (dict(zip([input_name], [image])), label))
-    dataset = dataset.prefetch(int(batch_size/2))
+    dataset = dataset.prefetch(4*batch_size)
 
     # Configure batches
     if shuffle:
@@ -39,6 +39,7 @@ def input_fn_from_files(input_name, filenames, labels=None, mode='train', shuffl
 def _train_input_parse(filename, label):
     image_string = tf.read_file(filename)
     image = tf.image.decode_image(image_string, channels=3)
+    image = tf.cast(image, tf.float32)
     image = tf.random_crop(image, IMAGE_INPUT_SHAPE)
     image.set_shape(IMAGE_INPUT_SHAPE)
     return image, label
@@ -48,6 +49,7 @@ def _train_input_parse(filename, label):
 def _val_input_parse(filename, label):
     image_string = tf.read_file(filename)
     image = tf.image.decode_image(image_string, channels=3)
+    image = tf.cast(image, tf.float32)
     image = tf.image.resize_image_with_crop_or_pad(image, IMAGE_INPUT_SHAPE[0], IMAGE_INPUT_SHAPE[1])
     image.set_shape(IMAGE_INPUT_SHAPE)
     return image, label
