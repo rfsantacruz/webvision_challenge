@@ -51,17 +51,19 @@ def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=1, ch
     for epoch in range(start_epoch, num_epochs):
         # train for one epoch
         tr_loss, tr_acc1, tr_acc5 = wvc_model.train(train_data_loader, model, criterion, optimizer, epoch)
-        tb_logger.log_value('tr_loss', tr_loss, epoch), tb_logger.log_value('tr_acc1', tr_acc1, epoch)
-        tb_logger.log_value('tr_acc5', tr_acc5, epoch)
+        _logger.info("Epoch Train {}/{}: tr_loss={:.3f}, tr_acc1={:.3f}, tr_acc5={:.3f}"
+                     .format(epoch + 1, num_epochs, tr_loss, tr_acc1, tr_acc5))
+        tb_logger.log_value('tr_loss', tr_loss, epoch+1), tb_logger.log_value('tr_acc1', tr_acc1, epoch+1)
+        tb_logger.log_value('tr_acc5', tr_acc5, epoch+1)
 
         # Validation
         if (epoch + 1) % valid_int == 0:
             _logger.info("Validating...")
             val_loss, val_acc1, val_acc5 = wvc_model.validate(val_data_loader, model, criterion, epoch)
-            _logger.info("Epoch {}/{}: val_loss={:.3f}, val_acc1={:.3f}, val_acc5={:.3f}"
+            _logger.info("Epoch Validation {}/{}: val_loss={:.3f}, val_acc1={:.3f}, val_acc5={:.3f}"
                          .format(epoch+1, num_epochs, val_loss, val_acc1, val_acc5))
-            tb_logger.log_value('val_loss', val_loss, epoch), tb_logger.log_value('val_acc1', val_acc1, epoch)
-            tb_logger.log_value('val_acc5', val_acc5, epoch)
+            tb_logger.log_value('val_loss', val_loss, epoch+1), tb_logger.log_value('val_acc1', val_acc1, epoch+1)
+            tb_logger.log_value('val_acc5', val_acc5, epoch+1)
 
             # save checkpoint
             model_ckp_name = "M{}_E{}_L{:.3f}_ACC1{:.3f}_ACC5_{:.3f}.pth.tar".format(model_name, epoch+1, val_loss, val_acc1, val_acc5)

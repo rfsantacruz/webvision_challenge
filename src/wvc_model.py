@@ -36,7 +36,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
         # epoch progress bar
         pbar.set_description("Train epoch {} ({}/{}): Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
-                epoch, i, total_batches, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
+                epoch+1, i, total_batches, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
 
     return c_loss / total_batches, c_acc1 / total_batches, c_acc5 / total_batches
 
@@ -64,7 +64,7 @@ def validate(val_loader, model, criterion, epoch):
 
         # validation progress
         pbar.set_description("Validation {} ({}/{}): Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
-                epoch, i, total_batches, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
+                epoch+1, i, total_batches, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
 
     return c_loss / total_batches, c_acc1 / total_batches, c_acc5 / total_batches
 
