@@ -4,13 +4,13 @@ from torch.cuda import device_count
 import torch
 import wvc_data, wvc_model, wvc_utils
 import logging, os
-
+from tensorboard_logger import tensorboard_logger as tb_log
 
 
 _logger = logging.getLogger(__name__)
 
 
-def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=25, checkpoint=None, num_workers=5, kwargs_str=None):
+def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=1, checkpoint=None, num_workers=5, kwargs_str=None):
     # Data loading
     _logger.info("Reading WebVision Dataset")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -47,9 +47,12 @@ def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=25, c
 
     # Training and Validation loop
     _logger.info("Training...")
+    tb_logger = tb_log.Logger("")
     for epoch in range(start_epoch, num_epochs):
         # train for one epoch
-        wvc_model.train(train_data_loader, model, criterion, optimizer, epoch)
+        tr_loss, tr_acc1, tr_acc5 = wvc_model.train(train_data_loader, model, criterion, optimizer, epoch)
+        tb_logger.log_value('tr_loss', tr_loss, epoch), tb_logger.log_value('tr_acc1', tr_acc1, epoch)
+        tb_logger.log_value('tr_acc5', tr_acc5, epoch)
 
         # Validation
         if (epoch + 1) % valid_int == 0:
@@ -57,6 +60,8 @@ def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=25, c
             val_loss, val_acc1, val_acc5 = wvc_model.validate(val_data_loader, model, criterion, epoch)
             _logger.info("Epoch {}/{}: val_loss={:.3f}, val_acc1={:.3f}, val_acc5={:.3f}"
                          .format(epoch+1, num_epochs, val_loss, val_acc1, val_acc5))
+            tb_logger.log_value('val_loss', val_loss, epoch), tb_logger.log_value('val_acc1', val_acc1, epoch)
+            tb_logger.log_value('val_acc5', val_acc5, epoch)
 
             # save checkpoint
             model_ckp_name = "M{}_E{}_L{:.3f}_ACC1{:.3f}_ACC5_{:.3f}.pth.tar".format(model_name, epoch+1, val_loss, val_acc1, val_acc5)
@@ -79,7 +84,7 @@ if __name__ == '__main__':
     parser.add_argument('output_dir', type=str, help='Path to the output directory.')
     parser.add_argument('-batch_size', type=int, default=128, help='Batch size.')
     parser.add_argument('-num_epochs', type=int, default=100, help='Number of epochs.')
-    parser.add_argument('-valid_int', type=int, default=25, help='Number epochs between evaluations.')
+    parser.add_argument('-valid_int', type=int, default=1, help='Number epochs between evaluations.')
     parser.add_argument('-ckp_file', type=str, default=None, help='Resume from checkpoint file.')
     parser.add_argument('-gpu_str', type=str, default="0", help='Set CUDA_VISIBLE_DEVICES variable.')
     parser.add_argument('-num_workers', type=int, default=5, help='Number of preprocessing workers.')

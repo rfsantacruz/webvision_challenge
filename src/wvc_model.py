@@ -1,10 +1,7 @@
-import shutil
-
-import os
 import torch
 import torchvision
-import wvc_model
-import logging
+from tqdm import tqdm
+import shutil, os, logging
 
 _logger = logging.getLogger(__name__)
 MODELS = ['vgg16', 'inception', 'resnet', 'densenet']
@@ -17,7 +14,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
     # switch to train mode
     model.train()
-    for i, (images, target) in enumerate(train_loader):
+    pbar = tqdm(train_loader)
+    for i, (images, target) in enumerate(pbar):
         target = target.cuda(async=True)
         image_var = torch.autograd.Variable(images)
         label_var = torch.autograd.Variable(target)
@@ -32,13 +30,15 @@ def train(train_loader, model, criterion, optimizer, epoch):
         optimizer.step()
 
         # measure loss and performance
-        c_acc1 += wvc_model.top_k_acc(target, y_pred.data, top_k=1)
-        c_acc5 += wvc_model.top_k_acc(target, y_pred.data, top_k=5)
+        c_acc1 += top_k_acc(target, y_pred.data, top_k=1)
+        c_acc5 += top_k_acc(target, y_pred.data, top_k=5)
         c_loss += loss.data[0]
 
-        if i % 100 == 0:
-            _logger.info("Train epoch {} ({}/{}): Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
+        # epoch progress bar
+        pbar.set_description("Train epoch {} ({}/{}): Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
                 epoch, i, total_batches, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
+
+    return c_loss / total_batches, c_acc1 / total_batches, c_acc5 / total_batches
 
 
 def validate(val_loader, model, criterion, epoch):
@@ -47,8 +47,8 @@ def validate(val_loader, model, criterion, epoch):
 
     # switch to evaluate mode
     model.eval()
-
-    for i, (images, labels) in enumerate(val_loader):
+    pbar = tqdm(val_loader)
+    for i, (images, labels) in enumerate(pbar):
         labels = labels.cuda(async=True)
         image_var = torch.autograd.Variable(images, volatile=True)
         label_var = torch.autograd.Variable(labels, volatile=True)
@@ -58,11 +58,12 @@ def validate(val_loader, model, criterion, epoch):
         loss = criterion(y_pred, label_var)
 
         # measure loss and performance
-        c_acc1 += wvc_model.top_k_acc(labels, y_pred.data, top_k=1)
-        c_acc5 += wvc_model.top_k_acc(labels, y_pred.data, top_k=5)
+        c_acc1 += top_k_acc(labels, y_pred.data, top_k=1)
+        c_acc5 += top_k_acc(labels, y_pred.data, top_k=5)
         c_loss += loss.data[0]
-        if i % 100 == 0:
-            _logger.info("Validation {} ({}/{}): Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
+
+        # validation progress
+        pbar.set_description("Validation {} ({}/{}): Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
                 epoch, i, total_batches, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
 
     return c_loss / total_batches, c_acc1 / total_batches, c_acc5 / total_batches
