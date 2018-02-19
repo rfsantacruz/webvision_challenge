@@ -1,7 +1,8 @@
 import torch
 import torchvision
 from tqdm import tqdm
-import shutil, os, logging
+import shutil, os, logging, math
+import wvc_utils
 
 _logger = logging.getLogger(__name__)
 MODELS = ['vgg16', 'inception', 'resnet', 'densenet']
@@ -10,13 +11,14 @@ MODELS = ['vgg16', 'inception', 'resnet', 'densenet']
 def train(train_loader, model, criterion, optimizer, epoch):
     # metrics
     c_acc1, c_acc5, c_loss = 0.0, 0.0, 0.0
-    total_batches = int(len(train_loader.dataset) / train_loader.batch_size)
+    total_batches = math.ceil(len(train_loader.dataset) / train_loader.batch_size)
 
     # switch to train mode
     model.train()
     pbar = tqdm(train_loader)
     for i, (images, target) in enumerate(pbar):
         target = target.cuda(async=True)
+        images = images.cuda(async=True)
         image_var = torch.autograd.Variable(images)
         label_var = torch.autograd.Variable(target)
 
@@ -24,32 +26,32 @@ def train(train_loader, model, criterion, optimizer, epoch):
         y_pred = model(image_var)
         loss = criterion(y_pred, label_var)
 
+        # measure loss and performance
+        accs = top_k_acc(target, y_pred.data, top_k=(1, 5))
+        c_acc1 += accs[0]; c_acc5 += accs[1]; c_loss += loss.data[0]
+
         # compute gradients and backprop
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        # measure loss and performance
-        c_acc1 += top_k_acc(target, y_pred.data, top_k=1)
-        c_acc5 += top_k_acc(target, y_pred.data, top_k=5)
-        c_loss += loss.data[0]
-
         # epoch progress bar
-        pbar.set_description("Train epoch {} ({}/{}): Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
-                epoch+1, i, total_batches, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
+        pbar.set_description("Train epoch {}: Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
+                epoch+1, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
 
     return c_loss / total_batches, c_acc1 / total_batches, c_acc5 / total_batches
 
 
 def validate(val_loader, model, criterion, epoch):
     c_loss, c_acc1, c_acc5 = 0.0, 0.0, 0.0
-    total_batches = int(len(val_loader.dataset) / val_loader.batch_size)
+    total_batches = math.ceil(len(val_loader.dataset) / val_loader.batch_size)
 
     # switch to evaluate mode
     model.eval()
     pbar = tqdm(val_loader)
     for i, (images, labels) in enumerate(pbar):
         labels = labels.cuda(async=True)
+        images = images.cuda(async=True)
         image_var = torch.autograd.Variable(images, volatile=True)
         label_var = torch.autograd.Variable(labels, volatile=True)
 
@@ -58,13 +60,12 @@ def validate(val_loader, model, criterion, epoch):
         loss = criterion(y_pred, label_var)
 
         # measure loss and performance
-        c_acc1 += top_k_acc(labels, y_pred.data, top_k=1)
-        c_acc5 += top_k_acc(labels, y_pred.data, top_k=5)
-        c_loss += loss.data[0]
+        accs = top_k_acc(labels, y_pred.data, top_k=(1, 5))
+        c_acc1 += accs[0]; c_acc5 += accs[1]; c_loss += loss.data[0]
 
         # validation progress
-        pbar.set_description("Validation {} ({}/{}): Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
-                epoch+1, i, total_batches, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
+        pbar.set_description("Validation {}: Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
+                epoch+1, c_loss / (i+1), c_acc1 / (i+1), c_acc5 / (i+1)))
 
     return c_loss / total_batches, c_acc1 / total_batches, c_acc5 / total_batches
 
@@ -82,14 +83,17 @@ def model_factory(model_name, model_kwargs_dict):
         raise ValueError("Model {} is not supported".format(model_name))
 
 
-def top_k_acc(y_true, y_pred, top_k=5):
-    pred_labels = torch.topk(y_pred, top_k)[1].int()
+def top_k_acc(y_true, y_pred, top_k=(1,)):
+    pred_labels = torch.topk(y_pred, max(top_k))[1].int()
     true_labels = y_true.view(-1, 1).int()
-    acc = torch.eq(true_labels, pred_labels).int()
-    acc = torch.sum(acc, 1)
-    acc = torch.gt(acc, 0).int()
-    acc = torch.mean(acc.float())
-    return acc
+    tps = torch.eq(true_labels, pred_labels).int()
+
+    res = []
+    for k in top_k:
+        acc = torch.sum(tps[:, :k], 1)
+        acc = torch.mean(acc.float())
+        res.append(acc)
+    return res
 
 
 def save_checkpoint(state, is_best, ckpt_dir, ckpt_name):

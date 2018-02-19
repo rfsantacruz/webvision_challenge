@@ -10,7 +10,7 @@ from tensorboard_logger import tensorboard_logger as tb_log
 _logger = logging.getLogger(__name__)
 
 
-def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=1, checkpoint=None, num_workers=5, kwargs_str=None):
+def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, checkpoint=None, num_workers=5, kwargs_str=None):
     # Data loading
     _logger.info("Reading WebVision Dataset")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -28,32 +28,35 @@ def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=1, ch
     kwargs_dic = wvc_utils.get_kwargs_dic(kwargs_str)
     _logger.info("Arguments: {}".format(kwargs_dic))
     model = wvc_model.model_factory(model_name, kwargs_dic)
-    _logger.info("Parallelizing model in {} GPUS".format(device_count()))
+    _logger.info("Running model with {} GPUS and {} data workers".format(device_count(), num_workers))
     model = torch.nn.DataParallel(model).cuda()
+
+    # Objective and Optimizer
+    _logger.info("Setting up loss function and optimizer")
+    criterion = torch.nn.CrossEntropyLoss().cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(kwargs_dic.get("lr", 1e-1)),
+                                 weight_decay=float(kwargs_dic.get("weight_decay", 1e-4)))
+
+    # Optionally resume from a checkpoint
     if checkpoint is not None:
         _logger.info("Resume training from {}".format(checkpoint))
         checkpoint = torch.load(checkpoint)
         start_epoch = checkpoint['epoch'] - 1
         best_acc5 = checkpoint['best_acc5']
         model.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
     else:
         start_epoch, best_acc5 = 0, 0.0
 
-    # Objective and Optimizer
-    _logger.info("Setting up loss function and optimizer")
-    criterion = torch.nn.CrossEntropyLoss().cuda()
-    optimizer = torch.optim.Adam(model.parameters(), lr=float(kwargs_dic.get("lr", 1e-3)),
-                                 weight_decay=float(kwargs_dic.get("weight_decay", 1e-4)))
-
     # Training and Validation loop
     _logger.info("Training...")
-    tb_logger = tb_log.Logger("")
+    tb_logger = tb_log.Logger(output_dir)
     for epoch in range(start_epoch, num_epochs):
         # train for one epoch
         tr_loss, tr_acc1, tr_acc5 = wvc_model.train(train_data_loader, model, criterion, optimizer, epoch)
         _logger.info("Epoch Train {}/{}: tr_loss={:.3f}, tr_acc1={:.3f}, tr_acc5={:.3f}"
                      .format(epoch + 1, num_epochs, tr_loss, tr_acc1, tr_acc5))
-        tb_logger.log_value('tr_loss', tr_loss, epoch+1), tb_logger.log_value('tr_acc1', tr_acc1, epoch+1)
+        tb_logger.log_value('tr_loss', tr_loss, epoch+1); tb_logger.log_value('tr_acc1', tr_acc1, epoch+1)
         tb_logger.log_value('tr_acc5', tr_acc5, epoch+1)
 
         # Validation
@@ -62,7 +65,7 @@ def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=1, ch
             val_loss, val_acc1, val_acc5 = wvc_model.validate(val_data_loader, model, criterion, epoch)
             _logger.info("Epoch Validation {}/{}: val_loss={:.3f}, val_acc1={:.3f}, val_acc5={:.3f}"
                          .format(epoch+1, num_epochs, val_loss, val_acc1, val_acc5))
-            tb_logger.log_value('val_loss', val_loss, epoch+1), tb_logger.log_value('val_acc1', val_acc1, epoch+1)
+            tb_logger.log_value('val_loss', val_loss, epoch+1); tb_logger.log_value('val_acc1', val_acc1, epoch+1)
             tb_logger.log_value('val_acc5', val_acc5, epoch+1)
 
             # save checkpoint
@@ -73,6 +76,7 @@ def main(model_name, output_dir, batch_size=128, num_epochs=100, valid_int=1, ch
             wvc_model.save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
                 'best_acc5': best_acc5}, is_best, output_dir, model_ckp_name)
 
 
@@ -84,7 +88,7 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('model_name', type=str, choices=wvc_model.MODELS, help='Name of the CNN architecture.')
     parser.add_argument('output_dir', type=str, help='Path to the output directory.')
-    parser.add_argument('-batch_size', type=int, default=128, help='Batch size.')
+    parser.add_argument('-batch_size', type=int, default=256, help='Batch size.')
     parser.add_argument('-num_epochs', type=int, default=100, help='Number of epochs.')
     parser.add_argument('-valid_int', type=int, default=1, help='Number epochs between evaluations.')
     parser.add_argument('-ckp_file', type=str, default=None, help='Resume from checkpoint file.')

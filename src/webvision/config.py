@@ -7,7 +7,7 @@ from os.path import join, isdir, basename, isfile
 from glob import glob
 
 # Global configuration
-DATA_BASE = '/data/home/rfsc/Datasets/webvision/'
+DATA_BASE = '/home/rfsc/Datasets/webvision/'
 INFO = join(DATA_BASE, 'info')
 DATA_SOURCE = ['google', 'flickr']
 TRAIN_FOLDER = join(DATA_BASE, 'train_images_256')
