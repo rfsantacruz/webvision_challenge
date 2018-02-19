@@ -15,7 +15,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
     # switch to train mode
     model.train()
-    pbar = tqdm(train_loader)
+    pbar = tqdm(train_loader, leave=False)
     for i, (images, target) in enumerate(pbar):
         target = target.cuda(async=True)
         images = images.cuda(async=True)
@@ -48,7 +48,7 @@ def validate(val_loader, model, criterion, epoch):
 
     # switch to evaluate mode
     model.eval()
-    pbar = tqdm(val_loader)
+    pbar = tqdm(val_loader, leave=False)
     for i, (images, labels) in enumerate(pbar):
         labels = labels.cuda(async=True)
         images = images.cuda(async=True)
@@ -76,7 +76,7 @@ def model_factory(model_name, model_kwargs_dict):
     if model_name == MODELS[1]:
         return torchvision.models.inception_v3(pretrained=False, num_classes=1000)
     if model_name == MODELS[2]:
-        return torchvision.models.resnet152(pretrained=False, num_classes=1000)
+        return torchvision.models.resnet50(pretrained=False, num_classes=1000)
     if model_name == MODELS[3]:
         return torchvision.models.densenet201(pretrained=False, num_classes=1000)
     else:

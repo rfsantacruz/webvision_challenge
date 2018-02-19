@@ -69,15 +69,15 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
             tb_logger.log_value('val_acc5', val_acc5, epoch+1)
 
             # save checkpoint
-            model_ckp_name = "M{}_E{}_L{:.3f}_ACC1{:.3f}_ACC5_{:.3f}.pth.tar".format(model_name, epoch+1, val_loss, val_acc1, val_acc5)
-            _logger.info("Save model checkpoint to {}".format(os.path.join(output_dir, model_ckp_name)))
+            model_ckpt_name = 'checkpoint.pth.tar'
+            _logger.info("Save model checkpoint to {}".format(os.path.join(output_dir, model_ckpt_name)))
             is_best = val_acc5 > best_acc5
             best_acc5 = max(val_acc5, best_acc5)
             wvc_model.save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
-                'best_acc5': best_acc5}, is_best, output_dir, model_ckp_name)
+                'best_acc5': best_acc5}, is_best, output_dir, model_ckpt_name)
 
 
 if __name__ == '__main__':
