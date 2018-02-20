@@ -14,7 +14,7 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
     # Data loading
     _logger.info("Reading WebVision Dataset")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    train_db = wvc_data.WebVision('train', transform=transforms.Compose([transforms.RandomResizedCrop(224),
+    train_db = wvc_data.WebVision('train', transform=transforms.Compose([transforms.RandomCrop(224),
                                                                          transforms.RandomHorizontalFlip(),
                                                                          transforms.ToTensor(), normalize]))
     train_data_loader = dataloader.DataLoader(train_db, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)

@@ -22,6 +22,8 @@ class WebVision(data.Dataset):
     def __getitem__(self, index):
         img = Image.open(self.img_files[index])
         label = self.img_labels[index]
+        if img.mode != 'RGB':
+            img = img.convert(mode='RGB')
         if self.transform is not None:
             img = self.transform(img)
         return img, label
