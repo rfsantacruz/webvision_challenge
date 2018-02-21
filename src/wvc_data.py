@@ -9,6 +9,8 @@ _logger = logging.getLogger(__name__)
 
 class WebVision(data.Dataset):
     def __init__(self, split='train', transform=None):
+
+        # Load data
         db_info = wvc_config.LoadInfo()
         self.split = split
         self.img_ids = db_info[db_info.type == split].image_id.values.astype(np.str)
@@ -17,6 +19,12 @@ class WebVision(data.Dataset):
         self.transform = transform
         assert len(self.img_ids) == len(self.img_files)
         assert len(self.img_ids) == len(self.img_labels)
+
+        # Compute class frequency
+        self.class_freq = np.bincount(self.img_labels)
+        assert self.class_freq.size == 1000
+        self.sample_weight = self.img_labels.size / (self.class_freq[self.img_labels] + 1e-3)
+
         _logger.info("Webvision {} dataset read with {} images".format(split, len(self.img_ids)))
 
     def __getitem__(self, index):

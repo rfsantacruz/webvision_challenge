@@ -1,5 +1,6 @@
 from torchvision import transforms
 from torch.utils.data import dataloader
+from torch.utils.data.sampler import WeightedRandomSampler
 from torch.cuda import device_count
 import torch
 import wvc_data, wvc_model, wvc_utils
@@ -17,7 +18,9 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
     train_db = wvc_data.WebVision('train', transform=transforms.Compose([transforms.RandomCrop(224),
                                                                          transforms.RandomHorizontalFlip(),
                                                                          transforms.ToTensor(), normalize]))
-    train_data_loader = dataloader.DataLoader(train_db, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
+    balanced_sampler = WeightedRandomSampler(train_db.sample_weight, train_db.sample_weight.size, replacement=False)
+    train_data_loader = dataloader.DataLoader(train_db, batch_size=batch_size, sampler=balanced_sampler,
+                                              num_workers=num_workers, pin_memory=True)
 
     val_db = wvc_data.WebVision('val', transform=transforms.Compose([transforms.CenterCrop(224),
                                                                      transforms.ToTensor(), normalize]))
