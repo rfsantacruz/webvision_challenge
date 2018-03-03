@@ -18,7 +18,7 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
     train_db = wvc_data.WebVision('train', transform=transforms.Compose([transforms.RandomCrop(224),
                                                                          transforms.RandomHorizontalFlip(),
                                                                          transforms.ToTensor(), normalize]))
-    balanced_sampler = WeightedRandomSampler(train_db.sample_weight, train_db.sample_weight.size, replacement=False)
+    balanced_sampler = WeightedRandomSampler(train_db.sample_weight, train_db.sample_weight.size, replacement=True)
     train_data_loader = dataloader.DataLoader(train_db, batch_size=batch_size, sampler=balanced_sampler,
                                               num_workers=num_workers, pin_memory=True)
 
@@ -37,14 +37,14 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
     # Objective and Optimizer
     _logger.info("Setting up loss function and optimizer")
     criterion = torch.nn.CrossEntropyLoss().cuda()
-    optimizer = torch.optim.Adam(model.parameters(), lr=float(kwargs_dic.get("lr", 1e-1)),
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(kwargs_dic.get("lr", 1e-2)),
                                  weight_decay=float(kwargs_dic.get("weight_decay", 1e-4)))
 
     # Optionally resume from a checkpoint
     if checkpoint is not None:
         _logger.info("Resume training from {}".format(checkpoint))
         checkpoint = torch.load(checkpoint)
-        start_epoch = checkpoint['epoch'] - 1
+        start_epoch = checkpoint['epoch'] + 1
         best_acc5 = checkpoint['best_acc5']
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
@@ -58,9 +58,9 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
         # train for one epoch
         tr_loss, tr_acc1, tr_acc5 = wvc_model.train(train_data_loader, model, criterion, optimizer, epoch)
         _logger.info("Epoch Train {}/{}: tr_loss={:.3f}, tr_acc1={:.3f}, tr_acc5={:.3f}"
-                     .format(epoch + 1, num_epochs, tr_loss, tr_acc1, tr_acc5))
-        tb_logger.log_value('tr_loss', tr_loss, epoch+1); tb_logger.log_value('tr_acc1', tr_acc1, epoch+1)
-        tb_logger.log_value('tr_acc5', tr_acc5, epoch+1)
+                     .format(epoch, num_epochs, tr_loss, tr_acc1, tr_acc5))
+        tb_logger.log_value('tr_loss', tr_loss, epoch); tb_logger.log_value('tr_acc1', tr_acc1, epoch)
+        tb_logger.log_value('tr_acc5', tr_acc5, epoch)
 
         # Validation
         if (epoch + 1) % valid_int == 0:
@@ -68,8 +68,8 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
             val_loss, val_acc1, val_acc5 = wvc_model.validate(val_data_loader, model, criterion, epoch)
             _logger.info("Epoch Validation {}/{}: val_loss={:.3f}, val_acc1={:.3f}, val_acc5={:.3f}"
                          .format(epoch+1, num_epochs, val_loss, val_acc1, val_acc5))
-            tb_logger.log_value('val_loss', val_loss, epoch+1); tb_logger.log_value('val_acc1', val_acc1, epoch+1)
-            tb_logger.log_value('val_acc5', val_acc5, epoch+1)
+            tb_logger.log_value('val_loss', val_loss, epoch); tb_logger.log_value('val_acc1', val_acc1, epoch)
+            tb_logger.log_value('val_acc5', val_acc5, epoch)
 
             # save checkpoint
             model_ckpt_name = 'checkpoint.pth.tar'
@@ -77,7 +77,7 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
             is_best = val_acc5 > best_acc5
             best_acc5 = max(val_acc5, best_acc5)
             wvc_model.save_checkpoint({
-                'epoch': epoch + 1,
+                'epoch': epoch,
                 'state_dict': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'best_acc5': best_acc5}, is_best, output_dir, model_ckpt_name)
