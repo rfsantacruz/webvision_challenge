@@ -1,0 +1,247 @@
+################ PILLOW for 66 iteration
+
+Timer unit: 1e-06 s
+
+Total time: 86.2149 s
+File: /home/rfsc/Projects/webvision_challenge/src/wvc_data.py
+Function: __getitem__ at line 32
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    32                                               @profile
+    33                                               def __getitem__(self, index):
+    34     21440   12492936.0    582.7     14.5          img = Image.open(self.img_files[index])
+    35     21440     124184.0      5.8      0.1          label = self.img_labels[index]
+    36     21440      21141.0      1.0      0.0          if img.mode != 'RGB':
+    37       397    2565599.0   6462.5      3.0              img = img.convert(mode='RGB')
+    38     21440      16797.0      0.8      0.0          if self.transform is not None:
+    39     21440   70957657.0   3309.6     82.3              img = self.transform(img)
+    40     21440      36634.0      1.7      0.0          return img, label
+
+Total time: 260.412 s
+File: /home/rfsc/Projects/webvision_challenge/src/wvc_model.py
+Function: train at line 10
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    10                                           @profile
+    11                                           def train(train_loader, model, criterion, optimizer, epoch):
+    12                                               # metrics
+    13         1         17.0     17.0      0.0      losses, top1, top5 = AverageMeter(), AverageMeter(), AverageMeter()
+    14                                           
+    15                                               # switch to train mode
+    16         1       4004.0   4004.0      0.0      model.train()
+    17         1       1411.0   1411.0      0.0      pbar = tqdm(train_loader, leave=False)
+    18        67  187341858.0 2796147.1     71.9      for i, (images, target) in enumerate(pbar):
+    19        67       8111.0    121.1      0.0          target = target.cuda(async=True)
+    20        67       4706.0     70.2      0.0          images = images.cuda(async=True)
+    21        67       1838.0     27.4      0.0          image_var = torch.autograd.Variable(images)
+    22        67        788.0     11.8      0.0          label_var = torch.autograd.Variable(target)
+    23                                           
+    24                                                   # forward
+    25        67   32554228.0 485884.0     12.5          y_pred = model(image_var)
+    26        67     334526.0   4992.9      0.1          loss = criterion(y_pred, label_var)
+    27                                           
+    28                                                   # measure loss and performance
+    29        67    8168869.0 121923.4      3.1          accs = top_k_acc(target, y_pred.data, top_k=(1, 5))
+    30        66       2805.0     42.5      0.0          losses.update(loss.data[0], images.size(0))
+    31        66        334.0      5.1      0.0          top1.update(accs[0], images.size(0))
+    32        66        246.0      3.7      0.0          top5.update(accs[1], images.size(0))
+    33                                           
+    34                                                   # compute gradients and backprop
+    35        66     192525.0   2917.0      0.1          optimizer.zero_grad()
+    36        66   11475852.0 173876.5      4.4          loss.backward()
+    37        66   20306606.0 307675.8      7.8          optimizer.step()
+    38                                           
+    39                                                   # epoch progress bar
+    40        66        398.0      6.0      0.0          pbar.set_description("Train epoch {}: Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
+    41        66      12959.0    196.3      0.0                  epoch, losses.avg, top1.avg, top5.avg))
+    42                                           
+    43                                               return losses.avg, top1.avg, top5.avg
+
+
+######################################3 PILLOW-SIMD SSE
+
+Timer unit: 1e-06 s
+
+Total time: 84.1405 s
+File: /home/rfsc/Projects/webvision_challenge/src/wvc_data.py
+Function: __getitem__ at line 32
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    32                                               @profile
+    33                                               def __getitem__(self, index):
+    34     21440   12698035.0    592.3     15.1          img = Image.open(self.img_files[index])
+    35     21440     137390.0      6.4      0.2          label = self.img_labels[index]
+    36     21440      21307.0      1.0      0.0          if img.mode != 'RGB':
+    37       401    2630966.0   6561.0      3.1              img = img.convert(mode='RGB')
+    38     21440      17172.0      0.8      0.0          if self.transform is not None:
+    39     21440   68598903.0   3199.6     81.5              img = self.transform(img)
+    40     21440      36754.0      1.7      0.0          return img, label
+
+Total time: 382.302 s
+File: /home/rfsc/Projects/webvision_challenge/src/wvc_model.py
+Function: train at line 10
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    10                                           @profile
+    11                                           def train(train_loader, model, criterion, optimizer, epoch):
+    12                                               # metrics
+    13         1         20.0     20.0      0.0      losses, top1, top5 = AverageMeter(), AverageMeter(), AverageMeter()
+    14                                           
+    15                                               # switch to train mode
+    16         1       5255.0   5255.0      0.0      model.train()
+    17         1       1658.0   1658.0      0.0      pbar = tqdm(train_loader, leave=False)
+    18        67  309300861.0 4616430.8     80.9      for i, (images, target) in enumerate(pbar):
+    19        66       9480.0    143.6      0.0          target = target.cuda(async=True)
+    20        66       5715.0     86.6      0.0          images = images.cuda(async=True)
+    21        66       2318.0     35.1      0.0          image_var = torch.autograd.Variable(images)
+    22        66        978.0     14.8      0.0          label_var = torch.autograd.Variable(target)
+    23                                           
+    24                                                   # forward
+    25        66   32603891.0 493998.3      8.5          y_pred = model(image_var)
+    26        66     321142.0   4865.8      0.1          loss = criterion(y_pred, label_var)
+    27                                           
+    28                                                   # measure loss and performance
+    29        66    8057405.0 122081.9      2.1          accs = top_k_acc(target, y_pred.data, top_k=(1, 5))
+    30        66       2765.0     41.9      0.0          losses.update(loss.data[0], images.size(0))
+    31        66        356.0      5.4      0.0          top1.update(accs[0], images.size(0))
+    32        66        249.0      3.8      0.0          top5.update(accs[1], images.size(0))
+    33                                           
+    34                                                   # compute gradients and backprop
+    35        66     187308.0   2838.0      0.0          optimizer.zero_grad()
+    36        66   11509440.0 174385.5      3.0          loss.backward()
+    37        66   20278901.0 307256.1      5.3          optimizer.step()
+    38                                           
+    39                                                   # epoch progress bar
+    40        66        598.0      9.1      0.0          pbar.set_description("Train epoch {}: Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
+    41        66      13908.0    210.7      0.0                  epoch, losses.avg, top1.avg, top5.avg))
+    42                                           
+    43                                               return losses.avg, top1.avg, top5.avg
+
+############################ PILLOW-SIMD AVX2
+
+Timer unit: 1e-06 s
+
+Total time: 82.9643 s
+File: /home/rfsc/Projects/webvision_challenge/src/wvc_data.py
+Function: __getitem__ at line 32
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    32                                               @profile
+    33                                               def __getitem__(self, index):
+    34     21440   12383775.0    577.6     14.9          img = Image.open(self.img_files[index])
+    35     21440     123176.0      5.7      0.1          label = self.img_labels[index]
+    36     21440      21184.0      1.0      0.0          if img.mode != 'RGB':
+    37       403    2520252.0   6253.7      3.0              img = img.convert(mode='RGB')
+    38     21440      17437.0      0.8      0.0          if self.transform is not None:
+    39     21440   67862542.0   3165.2     81.8              img = self.transform(img)
+    40     21440      35898.0      1.7      0.0          return img, label
+
+Total time: 437.29 s
+File: /home/rfsc/Projects/webvision_challenge/src/wvc_model.py
+Function: train at line 10
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    10                                           @profile
+    11                                           def train(train_loader, model, criterion, optimizer, epoch):
+    12                                               # metrics
+    13         1         16.0     16.0      0.0      losses, top1, top5 = AverageMeter(), AverageMeter(), AverageMeter()
+    14                                           
+    15                                               # switch to train mode
+    16         1       4002.0   4002.0      0.0      model.train()
+    17         1      16392.0  16392.0      0.0      pbar = tqdm(train_loader, leave=False)
+    18        67  365436984.0 5454283.3     83.6      for i, (images, target) in enumerate(pbar):
+    19        66       9191.0    139.3      0.0          target = target.cuda(async=True)
+    20        66       5006.0     75.8      0.0          images = images.cuda(async=True)
+    21        66       1833.0     27.8      0.0          image_var = torch.autograd.Variable(images)
+    22        66        873.0     13.2      0.0          label_var = torch.autograd.Variable(target)
+    23                                           
+    24                                                   # forward
+    25        66   31765764.0 481299.5      7.3          y_pred = model(image_var)
+    26        66     343056.0   5197.8      0.1          loss = criterion(y_pred, label_var)
+    27                                           
+    28                                                   # measure loss and performance
+    29        66    7801313.0 118201.7      1.8          accs = top_k_acc(target, y_pred.data, top_k=(1, 5))
+    30        66       3212.0     48.7      0.0          losses.update(loss.data[0], images.size(0))
+    31        66        466.0      7.1      0.0          top1.update(accs[0], images.size(0))
+    32        66        292.0      4.4      0.0          top5.update(accs[1], images.size(0))
+    33                                           
+    34                                                   # compute gradients and backprop
+    35        66     188993.0   2863.5      0.0          optimizer.zero_grad()
+    36        66   11585766.0 175541.9      2.6          loss.backward()
+    37        66   20112907.0 304741.0      4.6          optimizer.step()
+    38                                           
+    39                                                   # epoch progress bar
+    40        66        474.0      7.2      0.0          pbar.set_description("Train epoch {}: Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
+    41        66      13440.0    203.6      0.0                  epoch, losses.avg, top1.avg, top5.avg))
+    42                                           
+    43                                               return losses.avg, top1.avg, top5.avg
+
+
+
+# ############################### OPENCV
+Timer unit: 1e-06 s
+
+Total time: 38.3212 s
+File: /home/rfsc/Projects/webvision_challenge/src/wvc_data.py
+Function: __getitem__ at line 37
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    37                                               @profile
+    38                                               def __getitem__(self, index):
+    39     11840   28761829.0   2429.2     75.1          img = cv2.imread(self.img_files[index], cv2.IMREAD_COLOR)
+    40     11840     518503.0     43.8      1.4          img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    41     11840      75539.0      6.4      0.2          label = self.img_labels[index]
+    42     11840      12814.0      1.1      0.0          if self.transform is not None:
+    43     11840    8935756.0    754.7     23.3              img = self.transform(img)
+    44     11840      16780.0      1.4      0.0          return img, label
+
+Total time: 554.909 s
+File: /home/rfsc/Projects/webvision_challenge/src/wvc_model.py
+Function: train at line 10
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    10                                           @profile
+    11                                           def train(train_loader, model, criterion, optimizer, epoch):
+    12                                               # metrics
+    13         1         17.0     17.0      0.0      losses, top1, top5 = AverageMeter(), AverageMeter(), AverageMeter()
+    14                                           
+    15                                               # switch to train mode
+    16         1       4060.0   4060.0      0.0      model.train()
+    17         1       1461.0   1461.0      0.0      pbar = tqdm(train_loader, leave=False)
+    18        37  478108868.0 12921861.3     86.2      for i, (images, target) in enumerate(pbar):
+    19        36       5269.0    146.4      0.0          target = target.cuda(async=True)
+    20        36      10430.0    289.7      0.0          images = images.cuda(async=True)
+    21        36       1271.0     35.3      0.0          image_var = torch.autograd.Variable(images)
+    22        36        514.0     14.3      0.0          label_var = torch.autograd.Variable(target)
+    23                                           
+    24                                                   # forward
+    25        36   54663816.0 1518439.3      9.9          y_pred = model(image_var)
+    26        36     201915.0   5608.8      0.0          loss = criterion(y_pred, label_var)
+    27                                           
+    28                                                   # measure loss and performance
+    29        36    4118379.0 114399.4      0.7          accs = top_k_acc(target, y_pred.data, top_k=(1, 5))
+    30        36       2078.0     57.7      0.0          losses.update(loss.data[0], images.size(0))
+    31        36        259.0      7.2      0.0          top1.update(accs[0], images.size(0))
+    32        36        186.0      5.2      0.0          top5.update(accs[1], images.size(0))
+    33                                           
+    34                                                   # compute gradients and backprop
+    35        36     115892.0   3219.2      0.0          optimizer.zero_grad()
+    36        36    6435308.0 178758.6      1.2          loss.backward()
+    37        36   11229634.0 311934.3      2.0          optimizer.step()
+    38                                           
+    39                                                   # epoch progress bar
+    40        36        277.0      7.7      0.0          pbar.set_description("Train epoch {}: Loss={:.3f}, ACC_1={:.3f}, ACC_5={:.3f}".format(
+    41        36       9346.0    259.6      0.0                  epoch, losses.avg, top1.avg, top5.avg))
+    42                                           
+    43                                               return losses.avg, top1.avg, top5.avg
+
+
+

@@ -4,26 +4,29 @@ from torch.utils.data.sampler import WeightedRandomSampler
 from torch.cuda import device_count
 import torch
 import wvc_data, wvc_model, wvc_utils
-import logging, os
+import logging, os, warnings
 from tensorboard_logger import tensorboard_logger as tb_log
+import webvision.config as wvc_config
 
-
+warnings.filterwarnings("ignore")
 _logger = logging.getLogger(__name__)
 
 
-def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, checkpoint=None, num_workers=5, kwargs_str=None):
+def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, checkpoint=None, num_workers=5,
+         kwargs_str=None):
     # Data loading
+    wvc_db_info = wvc_config.LoadInfo()
     _logger.info("Reading WebVision Dataset")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    train_db = wvc_data.WebVision('train', transform=transforms.Compose([transforms.RandomCrop(224),
-                                                                         transforms.RandomHorizontalFlip(),
-                                                                         transforms.ToTensor(), normalize]))
+    train_db = wvc_data.WebVision(wvc_db_info, 'train', transform=transforms.Compose([transforms.RandomCrop(224),
+                                                                                      transforms.ToTensor(),
+                                                                                      normalize]))
     balanced_sampler = WeightedRandomSampler(train_db.sample_weight, train_db.sample_weight.size, replacement=True)
     train_data_loader = dataloader.DataLoader(train_db, batch_size=batch_size, sampler=balanced_sampler,
                                               num_workers=num_workers, pin_memory=True)
 
-    val_db = wvc_data.WebVision('val', transform=transforms.Compose([transforms.CenterCrop(224),
-                                                                     transforms.ToTensor(), normalize]))
+    val_db = wvc_data.WebVision(wvc_db_info, 'val', transform=transforms.Compose([transforms.CenterCrop(224),
+                                                                                  transforms.ToTensor(), normalize]))
     val_data_loader = dataloader.DataLoader(val_db, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 
     # Model building
@@ -65,7 +68,8 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
         tr_loss, tr_acc1, tr_acc5 = wvc_model.train(train_data_loader, model, criterion, optimizer, epoch)
         _logger.info("Epoch Train {}/{}: tr_loss={:.3f}, tr_acc1={:.3f}, tr_acc5={:.3f}"
                      .format(epoch, num_epochs, tr_loss, tr_acc1, tr_acc5))
-        tb_logger.log_value('tr_loss', tr_loss, epoch); tb_logger.log_value('tr_acc1', tr_acc1, epoch)
+        tb_logger.log_value('tr_loss', tr_loss, epoch);
+        tb_logger.log_value('tr_acc1', tr_acc1, epoch)
         tb_logger.log_value('tr_acc5', tr_acc5, epoch)
 
         # Validation
@@ -73,8 +77,9 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
             _logger.info("Validating...")
             val_loss, val_acc1, val_acc5 = wvc_model.validate(val_data_loader, model, criterion, epoch)
             _logger.info("Epoch Validation {}/{}: val_loss={:.3f}, val_acc1={:.3f}, val_acc5={:.3f}"
-                         .format(epoch+1, num_epochs, val_loss, val_acc1, val_acc5))
-            tb_logger.log_value('val_loss', val_loss, epoch); tb_logger.log_value('val_acc1', val_acc1, epoch)
+                         .format(epoch + 1, num_epochs, val_loss, val_acc1, val_acc5))
+            tb_logger.log_value('val_loss', val_loss, epoch);
+            tb_logger.log_value('val_acc1', val_acc1, epoch)
             tb_logger.log_value('val_acc5', val_acc5, epoch)
 
             # save checkpoint
@@ -103,7 +108,8 @@ if __name__ == '__main__':
     parser.add_argument('-ckp_file', type=str, default=None, help='Resume from checkpoint file.')
     parser.add_argument('-gpu_str', type=str, default="0", help='Set CUDA_VISIBLE_DEVICES variable.')
     parser.add_argument('-num_workers', type=int, default=5, help='Number of preprocessing workers.')
-    parser.add_argument('-kwargs_str', type=str, default=None, help="Hyper parameters as string of key value, e.g., k1=v1; k2=v2; ...")
+    parser.add_argument('-kwargs_str', type=str, default=None,
+                        help="Hyper parameters as string of key value, e.g., k1=v1; k2=v2; ...")
     args = parser.parse_args()
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_str

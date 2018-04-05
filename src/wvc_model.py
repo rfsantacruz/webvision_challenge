@@ -1,8 +1,7 @@
 import torch
 import torchvision
 from tqdm import tqdm
-import shutil, os, logging, math
-import wvc_utils
+import shutil, os, logging
 
 _logger = logging.getLogger(__name__)
 MODELS = ['vgg16', 'inception', 'resnet', 'densenet']
@@ -74,13 +73,13 @@ def validate(val_loader, model, criterion, epoch):
 
 def model_factory(model_name, model_kwargs_dict):
     if model_name == MODELS[0]:
-        return torchvision.models.vgg16(pretrained=False, num_classes=1000)
+        return torchvision.models.vgg16(pretrained=False, num_classes=5000)
     if model_name == MODELS[1]:
-        return torchvision.models.inception_v3(pretrained=False, num_classes=1000)
+        return torchvision.models.inception_v3(pretrained=False, num_classes=5000)
     if model_name == MODELS[2]:
-        return torchvision.models.resnet50(pretrained=False, num_classes=1000)
+        return torchvision.models.resnet50(pretrained=False, num_classes=5000)
     if model_name == MODELS[3]:
-        return torchvision.models.densenet121(pretrained=False, num_classes=1000)
+        return torchvision.models.densenet121(pretrained=False, num_classes=5000)
     else:
         raise ValueError("Model {} is not supported".format(model_name))
 
