@@ -103,13 +103,6 @@ def save_checkpoint(state, is_best, ckpt_dir, ckpt_name):
         shutil.copyfile(os.path.join(ckpt_dir, ckpt_name), os.path.join(ckpt_dir, 'model_best.pth.tar'))
 
 
-def adjust_learning_rate(optimizer, epoch, initial_lr):
-    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = initial_lr * (0.1 ** (epoch // 30))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
-
 class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):

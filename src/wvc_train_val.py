@@ -45,6 +45,8 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
     optimizer = torch.optim.SGD(model.parameters(), float(kwargs_dic.get("lr", 1e-1)),
                                 momentum=float(kwargs_dic.get("momentum", 0.9)),
                                 weight_decay=float(kwargs_dic.get("weight_decay", 1e-4)))
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=int(kwargs_dic.get('lr_step', 30)),
+                                                gamma=float(kwargs_dic.get('lr_decay', 0.1)))
 
     # Optionally resume from a checkpoint
     if checkpoint is not None:
@@ -54,6 +56,8 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
         best_acc5 = checkpoint['best_acc5']
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
+        scheduler.step(start_epoch-1)
+
     else:
         start_epoch, best_acc5 = 0, 0.0
 
@@ -62,7 +66,7 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
     tb_logger = tb_log.Logger(output_dir)
     for epoch in range(start_epoch, num_epochs):
         # update learning rate for this epoch
-        wvc_model.adjust_learning_rate(optimizer, epoch, float(kwargs_dic.get("lr", 1e-1)))
+        scheduler.step()
 
         # train for one epoch
         tr_loss, tr_acc1, tr_acc5 = wvc_model.train(train_data_loader, model, criterion, optimizer, epoch)
