@@ -5,6 +5,7 @@ import os
 import pandas as pd
 from os.path import join, isdir, basename, isfile
 from glob import glob
+from PIL import Image
 
 # Global configuration
 DATA_BASE = '/home/rfsc/Datasets/webvision2.0/'
@@ -70,10 +71,13 @@ def LoadInfo():
 def ValidateIntegrity(info):
     # Validate all files exist
     for _, row in info.iterrows():
-        if not isfile(row.image_path):
-            print('Image file does not exist {}'.format(row.image_path))
+        img_path = os.path.splitext(row.image_path)[0] + ".jpg"
+        if not isfile(img_path):
+            print('Image file does not exist {}'.format(img_path))
         if row.type == 'train':
             if not isfile(row.meta_path):
                 print('Meta file does not exist {}'.format(row.meta_path))
+        if not min(Image.open(img_path).convert(mode='RGB').size) == 256:
+            print('Image file with wrong dimensions {}'.format(img_path))
 
     return True

@@ -2,10 +2,13 @@
 
 from __future__ import print_function
 import argparse
-# import config as config
-# import eval as eval
-import webvision.config as config
-import webvision.eval as eval
+
+try:
+    import webvision.config as config
+    import webvision.eval as eval
+except Exception:
+    import config as config
+    import eval as eval
 
 if __name__ == '__main__':
     # Parse the args

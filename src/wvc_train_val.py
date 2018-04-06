@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore")
 _logger = logging.getLogger(__name__)
 
 
-def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, checkpoint=None, num_workers=5,
+def main(model_name, output_dir, batch_size=320, num_epochs=15, valid_int=1, checkpoint=None, num_workers=5,
          kwargs_str=None):
     # Data loading
     wvc_db_info = wvc_config.LoadInfo()
@@ -45,7 +45,7 @@ def main(model_name, output_dir, batch_size=256, num_epochs=100, valid_int=1, ch
     optimizer = torch.optim.SGD(model.parameters(), float(kwargs_dic.get("lr", 1e-1)),
                                 momentum=float(kwargs_dic.get("momentum", 0.9)),
                                 weight_decay=float(kwargs_dic.get("weight_decay", 1e-4)))
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=int(kwargs_dic.get('lr_step', 30)),
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=int(kwargs_dic.get('lr_step', 4)),
                                                 gamma=float(kwargs_dic.get('lr_decay', 0.1)))
 
     # Optionally resume from a checkpoint
@@ -106,8 +106,8 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('model_name', type=str, choices=wvc_model.MODELS, help='Name of the CNN architecture.')
     parser.add_argument('output_dir', type=str, help='Path to the output directory.')
-    parser.add_argument('-batch_size', type=int, default=256, help='Batch size.')
-    parser.add_argument('-num_epochs', type=int, default=100, help='Number of epochs.')
+    parser.add_argument('-batch_size', type=int, default=320, help='Batch size.')
+    parser.add_argument('-num_epochs', type=int, default=15, help='Number of epochs.')
     parser.add_argument('-valid_int', type=int, default=1, help='Number epochs between evaluations.')
     parser.add_argument('-ckp_file', type=str, default=None, help='Resume from checkpoint file.')
     parser.add_argument('-gpu_str', type=str, default="0", help='Set CUDA_VISIBLE_DEVICES variable.')
