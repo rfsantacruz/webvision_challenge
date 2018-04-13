@@ -67,7 +67,7 @@ if __name__ == '__main__':
     parser.add_argument('model_ckp', type=str, help='Model checkpoint file.')
     parser.add_argument('db_split', type=str, help='Name of the data set split to evaluate.')
     parser.add_argument('submission_file', type=str, help='Path to output submission file.')
-    parser.add_argument('-batch_size', type=int, default=320, help='Batch size.')
+    parser.add_argument('-batch_size', type=int, default=32, help='Batch size.')
     parser.add_argument('-gpu_str', type=str, default="0", help='Set CUDA_VISIBLE_DEVICES variable.')
     parser.add_argument('-num_workers', type=int, default=5, help='Number of preprocessing workers.')
     parser.add_argument('-kwargs_str', type=str, default=None,
