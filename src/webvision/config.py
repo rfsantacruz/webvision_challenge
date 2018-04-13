@@ -49,13 +49,13 @@ def LoadInfo():
     training_df = pd.concat(all_train_data)
     training_df['image_path'] = training_df['image_id'].map(
         lambda x: join(TRAIN_FOLDER, x))
-    # # Load testing file list
-    # test_df = _ParseTextFile(
-    #     join(INFO, 'test_filelist.txt'),
-    #     ['image_id'])
-    # test_df['type'] = 'test'
-    # test_df['image_path'] = test_df['image_id'].map(
-    #     lambda x: join(TEST_FOLDER, x))
+    # Load testing file list
+    test_df = _ParseTextFile(
+        join(INFO, 'test_filelist.txt'),
+        ['image_id'])
+    test_df['type'] = 'test'
+    test_df['image_path'] = test_df['image_id'].map(
+        lambda x: join(TEST_FOLDER, x))
     # Load validation file list
     val_df = _ParseTextFile(
         join(INFO, 'val_filelist.txt'),
@@ -63,8 +63,7 @@ def LoadInfo():
     val_df['type'] = 'val'
     val_df['image_path'] = val_df['image_id'].map(
         lambda x: join(VAL_FOLDER, x))
-    data_info = pd.concat([training_df, val_df])
-    # data_info = pd.concat([training_df, val_df, test_df])
+    data_info = pd.concat([training_df, val_df, test_df])
     return data_info
 
 

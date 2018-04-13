@@ -52,28 +52,27 @@ class CycleIterator:
                 raise StopIteration()
 
 
-def init_logging(file_path='./log_default.txt'):
+def init_logging(log_file=None):
     """
     Initialize python logging module to log on console and file
     :param file_path: File path to save the log file
     """
     # Log format
     log_formatter = logging.Formatter('[%(asctime)-15s][%(levelname)s][%(filename)s:%(lineno)d] %(message)s')
-
-    # File and console handler
-    log_file_handler = logging.FileHandler(file_path, mode='w')
-    log_file_handler.setFormatter(log_formatter)
-    log_file_handler.setLevel(logging.INFO)
+    # Configure root logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_formatter)
     console_handler.setLevel(logging.INFO)
-
-    # configure root logger
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    logger.addHandler(log_file_handler)
     logger.addHandler(console_handler)
-
+    # File handler
+    if log_file:
+        log_file_handler = logging.FileHandler(log_file, mode='w')
+        log_file_handler.setFormatter(log_formatter)
+        log_file_handler.setLevel(logging.INFO)
+        logger.addHandler(log_file_handler)
 
 class TicToc:
     """

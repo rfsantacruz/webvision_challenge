@@ -31,13 +31,14 @@ class WebVision(data.Dataset):
         _logger.info("Webvision {} dataset read with {} images".format(split, len(self.img_ids)))
 
     def __getitem__(self, index):
+        img_id = self.img_ids[index]
         label = self.img_labels[index]
         img = Image.open(self.img_files[index])
         if img.mode != 'RGB':
             img = img.convert(mode='RGB')
         if self.transform is not None:
             img = self.transform(img)
-        return img, label
+        return img_id, img, label
 
     def __len__(self):
         return len(self.img_ids)

@@ -14,7 +14,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
     # switch to train mode
     model.train()
     pbar = tqdm(train_loader, leave=False)
-    for i, (images, target) in enumerate(pbar):
+    for i, (_, images, target) in enumerate(pbar):
         target = target.cuda(async=True)
         images = images.cuda(async=True)
         image_var = torch.autograd.Variable(images)
@@ -48,7 +48,7 @@ def validate(val_loader, model, criterion, epoch):
     # switch to evaluate mode
     model.eval()
     pbar = tqdm(val_loader, leave=False)
-    for i, (images, labels) in enumerate(pbar):
+    for i, (_, images, labels) in enumerate(pbar):
         labels = labels.cuda(async=True)
         images = images.cuda(async=True)
         image_var = torch.autograd.Variable(images, volatile=True)
