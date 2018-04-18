@@ -18,8 +18,15 @@ def main(model_name, model_ckp, db_split, submission_file, batch_size=320, num_w
     wvc_db_info = wvc_config.LoadInfo()
     _logger.info("Reading WebVision Dataset")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    test_db = wvc_data.WebVision(wvc_db_info, db_split, transform=transforms.Compose([transforms.CenterCrop(224),
-                                                                                  transforms.ToTensor(), normalize]))
+    # test_db = wvc_data.WebVision(wvc_db_info, db_split, transform=transforms.Compose([transforms.CenterCrop(224),
+    #                                                                               transforms.ToTensor(), normalize]))
+
+    test_db = wvc_data.WebVision(wvc_db_info, db_split,
+                                 transform=transforms.Compose([
+                                     transforms.TenCrop(224),
+                                     transforms.Lambda(lambda crops: torch.stack([normalize(transforms.ToTensor()(crop)) for crop in crops]))
+                                 ]))
+
     test_data_loader = dataloader.DataLoader(test_db, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 
     # Model building
@@ -44,7 +51,10 @@ def main(model_name, model_ckp, db_split, submission_file, batch_size=320, num_w
         img_idxs = np.array(img_idxs, np.str)
 
         # compute prediction and loss
+        bs, ncrops, c, h, w = image_var.size()
+        image_var = image_var.view(-1, c, h, w)
         y_prob = t_func.softmax(model(image_var), -1)
+        y_prob = y_prob.view(bs, ncrops, -1).mean(1)
         y_pred = torch.topk(y_prob.data, 5, -1)[1].int()
         for file, preds in zip(img_idxs, y_pred.cpu().numpy()):
             submission_values.append([file] + preds.astype(np.str).tolist())
