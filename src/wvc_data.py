@@ -18,9 +18,9 @@ class WebVision(data.Dataset):
 
         # Load data
         self.split = split
-        self.img_ids = db_info[db_info.type == split].image_id.values.astype(np.str)[:200]
-        self.img_files = db_info[db_info.type == split].image_path.values.astype(np.str)[:200]
-        self.img_labels = db_info[db_info.type == split].label.values.astype(np.long)[:200]
+        self.img_ids = db_info[db_info.type == split].image_id.values.astype(np.str)
+        self.img_files = db_info[db_info.type == split].image_path.values.astype(np.str)
+        self.img_labels = db_info[db_info.type == split].label.values.astype(np.long)
         self.transform = transform
         self.jigsaw = jigsaw
         assert len(self.img_ids) == len(self.img_files)
