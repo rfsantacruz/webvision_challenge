@@ -1,32 +1,20 @@
-from torchvision import transforms
 from torch.utils.data import dataloader
-from torch.utils.data.sampler import WeightedRandomSampler
 from torch.nn import functional as t_func
 from torch.cuda import device_count
 import torch
 import wvc_data, wvc_model, wvc_utils
 import logging, os, warnings
-import webvision.config as wvc_config
 from tqdm import tqdm
 import numpy as np
 warnings.filterwarnings("ignore")
 _logger = logging.getLogger(__name__)
 
 
-def main(model_name, model_ckp, db_split, submission_file, batch_size=320, num_workers=5, kwargs_str=None):
+def main(model_name, model_ckp, split_name, submission_file, batch_size=320, num_workers=5, kwargs_str=None):
     # Data loading
-    wvc_db_info = wvc_config.LoadInfo()
     _logger.info("Reading WebVision Dataset")
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    # test_db = wvc_data.WebVision(wvc_db_info, db_split, transform=transforms.Compose([transforms.CenterCrop(224),
-    #                                                                               transforms.ToTensor(), normalize]))
-
-    test_db = wvc_data.WebVision(wvc_db_info, db_split,
-                                 transform=transforms.Compose([
-                                     transforms.TenCrop(224),
-                                     transforms.Lambda(lambda crops: torch.stack([normalize(transforms.ToTensor()(crop)) for crop in crops]))
-                                 ]))
-
+    train_db, val_db, test_db = wvc_data.get_datasets(pre_train=False, is_lmdb=False)
+    test_db = {'train': train_db, 'val': val_db, 'test': test_db}[split_name]
     test_data_loader = dataloader.DataLoader(test_db, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 
     # Model building
@@ -75,7 +63,7 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('model_name', type=str, choices=wvc_model.MODELS, help='Name of the CNN architecture.')
     parser.add_argument('model_ckp', type=str, help='Model checkpoint file.')
-    parser.add_argument('db_split', type=str, help='Name of the data set split to evaluate.')
+    parser.add_argument('split_name', type=str, help='Webvision split name')
     parser.add_argument('submission_file', type=str, help='Path to output submission file.')
     parser.add_argument('-batch_size', type=int, default=32, help='Batch size.')
     parser.add_argument('-gpu_str', type=str, default="0", help='Set CUDA_VISIBLE_DEVICES variable.')
@@ -87,5 +75,5 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_str
     wvc_utils.init_logging()
     _logger.info("Test CNN Model Tool: {}".format(args))
-    main(args.model_name, args.model_ckp, args.db_split, args.submission_file, args.batch_size, args.num_workers,
+    main(args.model_name, args.model_ckp, args.split_name, args.submission_file, args.batch_size, args.num_workers,
          args.kwargs_str)
