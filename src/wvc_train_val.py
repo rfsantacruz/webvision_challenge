@@ -5,16 +5,18 @@ import torch
 import wvc_data, wvc_model, wvc_utils
 import logging, os, warnings
 from tensorboard_logger import tensorboard_logger as tb_log
+import numpy as np
 
 warnings.filterwarnings("ignore")
 _logger = logging.getLogger(__name__)
 
 
 def main(model_name, output_dir, batch_size=320, num_epochs=15, valid_int=1, checkpoint=None, init_weights=None,
-         num_workers=5, pre_train=False, kwargs_str=None):
+         num_workers=5, pre_train=False, train_subset_path=None, kwargs_str=None):
     # Data loading
     _logger.info("Reading WebVision Dataset")
-    train_db, val_db, _ = wvc_data.get_datasets(pre_train, is_lmdb=False)
+    subset = None if train_subset_path is None else np.load(train_subset_path)
+    train_db, val_db, _ = wvc_data.get_datasets(pre_train, is_lmdb=False, subset=subset)
     balanced_sampler = WeightedRandomSampler(train_db.sample_weight, train_db.sample_weight.size, replacement=True)
     train_data_loader = dataloader.DataLoader(train_db, batch_size=batch_size, sampler=balanced_sampler,
                                               num_workers=num_workers, pin_memory=True)
@@ -30,11 +32,19 @@ def main(model_name, output_dir, batch_size=320, num_epochs=15, valid_int=1, che
     _logger.info("Running model with {} GPUS and {} data workers".format(device_count(), num_workers))
     model = torch.nn.DataParallel(model).cuda()
 
+    # Optionally load weights
+    if init_weights is not None:
+        _logger.info("Loading weights from {}".format(init_weights))
+        init_weights = torch.load(init_weights)
+        model.load_state_dict(init_weights['state_dict'])
+
     # Objective and Optimizer
     _logger.info("Setting up loss function and optimizer")
     criterion = torch.nn.CrossEntropyLoss() if not pre_train else wvc_model.WeightedMultiLabelBinaryCrossEntropy(False)
     criterion = criterion.cuda()
-    optimizer = torch.optim.SGD(model.parameters(), float(kwargs_dic.get("lr", 1e-1)),
+    init_lr = float(kwargs_dic.get("lr", 1e-1))
+    optimizer = torch.optim.SGD([{'params': model.module.features.parameters(), 'lr': init_lr},
+                                 {'params': model.module.classifier.parameters(), 'lr': init_lr}], lr=init_lr,
                                 momentum=float(kwargs_dic.get("momentum", 0.9)),
                                 weight_decay=float(kwargs_dic.get("weight_decay", 1e-4)))
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=int(kwargs_dic.get('lr_step', 4)),
@@ -53,17 +63,11 @@ def main(model_name, output_dir, batch_size=320, num_epochs=15, valid_int=1, che
     else:
         start_epoch, best_acc5 = 0, 0.0
 
-    # Optionally load weights
-    if init_weights is not None:
-        _logger.info("Loading weights from {}".format(init_weights))
-        init_weights = torch.load(init_weights)
-        model.load_state_dict(init_weights['state_dict'])
-
     # Training and Validation loop
     _logger.info("Training...")
     tb_logger = tb_log.Logger(output_dir)
     metric_func = wvc_model.multilabel_metrics if pre_train else wvc_model.top_k_acc
-    best_metric_name = 'ml_acc' if pre_train else "acc_5"
+    best_metric_name = 'ml_acc' if pre_train else "acc5"
     for epoch in range(start_epoch, num_epochs):
         # update learning rate for this epoch
         scheduler.step()
@@ -115,6 +119,7 @@ if __name__ == '__main__':
     parser.add_argument('-gpu_str', type=str, default="0", help='Set CUDA_VISIBLE_DEVICES variable.')
     parser.add_argument('-num_workers', type=int, default=5, help='Number of preprocessing workers.')
     parser.add_argument('-pre_train', default=False, action='store_true', help='Pretrain the model.')
+    parser.add_argument('-train_subset', default=None, help='Path to the array with a subset of training images ids.')
     parser.add_argument('-kwargs_str', type=str, default=None,
                         help="Hyper parameters as string of key value, e.g., k1=v1; k2=v2; ...")
     args = parser.parse_args()
@@ -124,4 +129,4 @@ if __name__ == '__main__':
     wvc_utils.init_logging(log_file)
     _logger.info("Training and Validation CNN Model Tool: {}".format(args))
     main(args.model_name, args.output_dir, args.batch_size, args.num_epochs, args.valid_int, args.ckp_file,
-         args.init_weights, args.num_workers, args.pre_train, args.kwargs_str)
+         args.init_weights, args.num_workers, args.pre_train, args.train_subset, args.kwargs_str)

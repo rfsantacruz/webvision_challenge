@@ -9,12 +9,14 @@ from torchvision import transforms
 import random
 import itertools
 from webvision import config as wv_config
+from torchvision.transforms import functional as trans_func
+
 
 _logger = logging.getLogger(__name__)
 
 
 class WebVision(data.Dataset):
-    def __init__(self, db_info, split='train', transform=None, jigsaw=False):
+    def __init__(self, db_info, split='train', transform=None, jigsaw=False, frac=None, subset=None):
 
         # Load data
         self.split = split
@@ -25,6 +27,23 @@ class WebVision(data.Dataset):
         self.jigsaw = jigsaw
         assert len(self.img_ids) == len(self.img_files)
         assert len(self.img_ids) == len(self.img_labels)
+
+        if subset is not None:
+            subset_idx = np.isin(self.img_ids, subset)
+            self.img_ids = self.img_ids[subset_idx]
+            self.img_files = self.img_files[subset_idx]
+            self.img_labels = self.img_labels[subset_idx]
+            assert np.unique(self.img_labels).size == 5000
+            _logger.info("Selecting subset of {} images".format(len(subset)))
+
+        # compute fraction of the dataset
+        if frac is not None:
+            sampled_idxs, frac = [], 0.01
+            for k in np.unique(self.img_labels):
+                idxs = np.where(self.img_labels == k)[0]
+                idxs = np.random.choice(idxs, int(np.ceil(len(idxs)*frac)), replace=False)
+                sampled_idxs.extend(idxs.tolist())
+            self.img_ids, self.img_files, self.img_labels = self.img_ids[sampled_idxs], self.img_files[sampled_idxs], self.img_labels[sampled_idxs]
 
         # Adapt filenames to jpg
         for i in range(self.img_files.size):
@@ -128,7 +147,7 @@ class JigsawTransform:
         return crops
 
 
-def get_datasets(pre_train, is_lmdb):
+def get_datasets(pre_train, is_lmdb, subset=None):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     if pre_train:
         image_transform = {'train': transforms.Compose([transforms.RandomCrop(224), JigsawTransform(3, 64),
@@ -142,6 +161,10 @@ def get_datasets(pre_train, is_lmdb):
     else:
         image_transform = {'train': transforms.Compose([transforms.RandomCrop(224), transforms.ToTensor(), normalize]),
                            'val': transforms.Compose([transforms.CenterCrop(224), transforms.ToTensor(), normalize]),
+                           # 'val': transforms.Compose([DenseCropTransform(), transforms.Lambda(
+                           #     lambda crops: torch.stack([normalize(transforms.ToTensor()(crop)) for crop in crops]))]),
+                           # 'val': transforms.Compose([transforms.TenCrop(224), transforms.Lambda(
+                           #     lambda crops: torch.stack([normalize(transforms.ToTensor()(crop)) for crop in crops]))]),
                            'test': transforms.Compose([transforms.TenCrop(224), transforms.Lambda(
                                lambda crops: torch.stack([normalize(transforms.ToTensor()(crop)) for crop in crops]))])
                            }
@@ -152,8 +175,87 @@ def get_datasets(pre_train, is_lmdb):
         test_db = LMDBDataset('/data/home/rfsc/wvc/lmdb/test/', jigsaw=pre_train, image_transform=image_transform['test'])
     else:
         db_info = wv_config.LoadInfo()
-        train_db = WebVision(db_info, 'train', jigsaw=pre_train, transform=image_transform['train'])
+        train_db = WebVision(db_info, 'train', jigsaw=pre_train, transform=image_transform['train'], subset=subset)
         val_db = WebVision(db_info, 'val', jigsaw=pre_train, transform=image_transform['val'])
         test_db = WebVision(db_info, 'test', jigsaw=pre_train, transform=image_transform['test'])
 
     return train_db, val_db, test_db
+
+
+class DenseCropTransform:
+    def __init__(self, scales=(256, 288, 320, 352), crop_size=224):
+        self.scales = scales
+        self.crop_size = crop_size
+
+    def __call__(self, img):
+        crops = []
+        for scale in self.scales:
+            if min(img.size) != scale:
+                r_img = trans_func.resize(img, scale)
+            else:
+                r_img = img.copy()
+            w, h = r_img.size
+            square_crops_coord = [(0, 0, scale, scale),
+                                  (int(round((h - scale) / 2.)), int(round((w - scale) / 2.)), scale, scale),
+                                  (h-scale, w-scale, scale, scale)]
+            for upper, left, height, width in square_crops_coord:
+                square = trans_func.crop(r_img, upper, left, height, width)
+                sq_ten_crops = trans_func.ten_crop(square, self.crop_size)
+                sq_crop = trans_func.resize(square, self.crop_size)
+                sq_crop_mirror = trans_func.hflip(sq_crop)
+                crops.extend((sq_crop, sq_crop_mirror) + sq_ten_crops)
+        return crops
+
+
+# import wvc_utils
+# num_models = 5
+# frac_samples = 0.25
+# output_dir = '/home/rfsc/Projects/webvision_challenge/outputs/esemble/'
+#
+# db_info = wv_config.LoadInfo()
+# img_ids = db_info[db_info.type == 'train'].image_id.values.astype(np.str)
+# img_labels = db_info[db_info.type == 'train'].label.values.astype(np.long)
+# sampler_dict = {label: wvc_utils.CycleIterator(img_ids[np.equal(img_labels, label)].tolist(), shuffle=True)
+#                 for label in np.unique(img_labels)}
+#
+# # compute subsets
+# for num in range(num_models):
+#     subset = []
+#     for label, it in sampler_dict.items():
+#         print("Computing model {}, label {}".format(num+1, label))
+#         num_samples = int(np.ceil(frac_samples * len(it._items)))
+#         samples = [next(it) for _ in range(num_samples)]
+#         subset.extend(samples)
+#     subset = np.array(subset, dtype=np.str)
+#     print("Model {} has found {} samples".format(num+1, len(subset)))
+#     np.save(os.path.join(output_dir, 'subset_{}'.format(num+1)), subset)
+
+# files = ['/data/home/rfsc/wvc/outputs/baseline/sub_file_val_10crops_NEW.txt.prob.txt',
+#         '/data/home/rfsc/wvc/outputs/esemble/1/sub_file_val_10crops_new_e1.txt.prob.txt',
+#          '/data/home/rfsc/wvc/outputs/esemble/2/sub_file_val_10crops_new_e2.txt.prob.txt',
+#          '/data/home/rfsc/wvc/outputs/esemble/3/sub_file_val_10crops_new_e3.txt.prob.txt',
+#          '/data/home/rfsc/wvc/outputs/sub_val_esemble_base10crop.txt']
+#
+#
+# with open(files[0], 'r') as p1, open(files[1], 'r') as p2, open(files[2], 'r') as p3, open(files[3], 'r') as p4, open(files[4], 'w') as r :
+#     for lines in zip(p1, p2, p3, p4):
+#         lines = np.stack([np.array(line.split('\t'), dtype=np.str) for line in lines])
+#         id = [lines[0, 0]]
+#         vals = lines[:, 1:].astype(np.float).mean(axis=0)
+#         vals = np.argsort(vals)[-5:][::-1].astype(np.str).tolist()
+#         r.write("{}\n".format("\t".join(id + vals)))
+
+# probs = np.zeros((294099, 5000), dtype=np.float)
+# ids = np.zeros((294099, 1), dtype=np.str)
+# for file in files:
+#     b = np.loadtxt(file, dtype=np.str)
+#     ids = b[:, 0]
+#     probs += b[:, 1:].astype(np.float)
+# probs = probs * 0.25
+#
+# sc = np.argsort(probs, axis=1)[:, -5:][:, ::-1].astype(np.str)
+# sc = np.concatenate([ids, sc], axis=1).tolist()
+# with open('/data/home/rfsc/wvc/outputs/sub_val_esemble.txt', 'w') as f:
+#     for line in sc:
+#         f.write("{}\n".format("\t".join(line)))
+

@@ -1,3 +1,4 @@
+import itertools
 import torch
 from torch.nn import functional as t_func
 import torchvision
@@ -15,6 +16,8 @@ def train(train_loader, model, criterion, optimizer, metric_func, epoch):
 
     # switch to train mode
     model.train()
+    # epoch_samp_frac = int(len(train_loader) * epoch_size)
+    # pbar = tqdm(itertools.islice(train_loader, epoch_samp_frac), total=epoch_samp_frac, leave=False)
     pbar = tqdm(train_loader, leave=False)
     for i, (_, images, target) in enumerate(pbar):
         target = target.cuda(async=True)
@@ -139,7 +142,7 @@ def model_factory(model_name, model_kwargs_dict):
         raise ValueError("Model {} is not supported".format(model_name))
 
 
-def top_k_acc(y_true, y_pred, top_k=(1,)):
+def top_k_acc(y_true, y_pred, top_k=(1, 5)):
     pred_labels = torch.topk(y_pred, max(top_k))[1].int()
     true_labels = y_true.view(-1, 1).int()
     tps = torch.eq(true_labels, pred_labels).int()
@@ -148,7 +151,7 @@ def top_k_acc(y_true, y_pred, top_k=(1,)):
     for k in top_k:
         acc = torch.sum(tps[:, :k], 1)
         acc = torch.mean(acc.float())
-        res["acc_{}".format(k)] = acc
+        res["acc{}".format(k)] = acc
     return res
 
 

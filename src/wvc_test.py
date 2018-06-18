@@ -6,6 +6,7 @@ import wvc_data, wvc_model, wvc_utils
 import logging, os, warnings
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
 warnings.filterwarnings("ignore")
 _logger = logging.getLogger(__name__)
 
@@ -33,26 +34,22 @@ def main(model_name, model_ckp, split_name, submission_file, batch_size=320, num
     # Test Model
     _logger.info("Testing model")
     model.eval()
-    submission_values = []
-    for i, (img_idxs, images, _) in enumerate(tqdm(test_data_loader, desc='Test iterations')):
-        image_var = torch.autograd.Variable(images.cuda(async=True), volatile=True)
-        img_idxs = np.array(img_idxs, np.str)
+    probs_file = "{}.prob.txt".format(submission_file)
+    with open(submission_file, 'w') as f_sub, open(probs_file, 'w') as f_prob:
+        for i, (img_idxs, images, _) in enumerate(tqdm(test_data_loader, desc='Test iterations')):
+            image_var = torch.autograd.Variable(images.cuda(async=True), volatile=True)
+            img_idxs = np.array(img_idxs, np.str)
 
-        # compute prediction and loss
-        bs, ncrops, c, h, w = image_var.size()
-        image_var = image_var.view(-1, c, h, w)
-        y_prob = t_func.softmax(model(image_var), -1)
-        y_prob = y_prob.view(bs, ncrops, -1).mean(1)
-        y_pred = torch.topk(y_prob.data, 5, -1)[1].int()
-        for file, preds in zip(img_idxs, y_pred.cpu().numpy()):
-            submission_values.append([file] + preds.astype(np.str).tolist())
-    _logger.info("Predicted top 5 labels for {} images.".format(len(submission_values)))
-
-    # Save submission file
-    _logger.info("Saving submission file to {}".format(submission_file))
-    with open(submission_file, 'w') as f:
-        for line in submission_values:
-            f.write("{}\n".format("\t".join(line)))
+            # compute prediction and loss
+            bs, ncrops, c, h, w = image_var.size()
+            image_var = image_var.view(-1, c, h, w)
+            y_prob = t_func.softmax(model(image_var), -1)
+            y_prob = y_prob.view(bs, ncrops, -1).mean(1)
+            y_pred = torch.topk(y_prob.data, 5, -1)[1].int()
+            for file, preds, probs in zip(img_idxs, y_pred.cpu().numpy(), y_prob.data.cpu().numpy()):
+                f_sub.write("{}\n".format("\t".join([file] + preds.astype(np.str).tolist())))
+                f_prob.write("{}\n".format("\t".join([file] + probs.astype(np.str).tolist())))
+    _logger.info("Generated Files: submission={}, probs={}".format(submission_file, probs_file))
     _logger.info("Test model has finished!")
 
 
